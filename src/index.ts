@@ -9,6 +9,13 @@
 // Main API
 export { nameContract } from "./naming.js";
 
+// Individual naming steps (can be used independently)
+export {
+  createSubname,
+  setForwardResolution,
+  setReverseResolution,
+} from "./naming.js";
+
 // Utility functions
 export {
   isOwnable,
@@ -40,6 +47,12 @@ export type {
   NameContractOptions,
   NameContractResult,
   ContractType,
+  CreateSubnameOptions,
+  CreateSubnameResult,
+  SetForwardResolutionOptions,
+  SetForwardResolutionResult,
+  SetReverseResolutionOptions,
+  SetReverseResolutionResult,
 } from "./types.js";
 
 // ABIs (for advanced use cases)

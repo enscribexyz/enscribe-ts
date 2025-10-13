@@ -22,6 +22,12 @@ import type {
   NameContractResult,
   ContractType,
   ENSContracts,
+  CreateSubnameOptions,
+  CreateSubnameResult,
+  SetForwardResolutionOptions,
+  SetForwardResolutionResult,
+  SetReverseResolutionOptions,
+  SetReverseResolutionResult,
 } from "./types.js";
 
 /**
@@ -43,7 +49,6 @@ export async function isOwnable(
       args: [],
     });
 
-    console.log("contract implements Ownable");
     return true;
   } catch (err) {
     return false;
@@ -72,17 +77,12 @@ export async function isReverseClaimable(
       args: [reversedNode],
     })) as `0x${string}`;
 
-    console.log("resolvedaddr is " + resolvedAddr);
-
     if (resolvedAddr.toLowerCase() === walletClient.account?.address.toLowerCase()) {
-      console.log("contract implements Reverseclaimable");
       return true;
     } else {
-      console.log("contract does not implement reverseclaimable");
       return false;
     }
   } catch (err) {
-    console.log("there was an error checking if the contract was reverse claimer");
     return false;
   }
 }
@@ -141,6 +141,311 @@ async function detectContractType(
 }
 
 /**
+ * Create a subname if it doesn't already exist
+ * This function checks if a name exists and creates it if not
+ */
+export async function createSubname(
+  options: CreateSubnameOptions,
+): Promise<CreateSubnameResult> {
+  const {
+    name: normalizedName,
+    walletClient,
+    contracts,
+    contractAddress,
+    contractType,
+    correlationId = randomUUID(),
+    opType = "enscribe-nameexisting",
+    enableMetrics = false,
+  } = options;
+
+  const { label, parent } = parseNormalizedName(normalizedName);
+  const parentNode = namehash(parent);
+  const labelHash = keccak256(toBytes(label));
+  const fullNameNode = namehash(normalizedName);
+
+  // Check if name exists
+  const nameExists = (await readContract(walletClient, {
+    address: contracts.ENS_REGISTRY as `0x${string}`,
+    abi: ensRegistryABI,
+    functionName: "recordExists",
+    args: [fullNameNode],
+  })) as boolean;
+
+  if (nameExists) {
+    return {
+      created: false,
+    };
+  }
+
+  // Create subname
+  let txn;
+  const isWrapped = await readContract(walletClient, {
+    address: contracts.NAME_WRAPPER as `0x${string}`,
+    abi: nameWrapperABI,
+    functionName: "isWrapped",
+    args: [parentNode],
+  });
+
+  if (isWrapped) {
+    txn = await writeContract(walletClient, {
+      address: contracts.NAME_WRAPPER as `0x${string}`,
+      abi: nameWrapperABI,
+      functionName: "setSubnodeRecord",
+      args: [
+        parentNode,
+        label,
+        walletClient.account?.address,
+        contracts.PUBLIC_RESOLVER,
+        0,
+        0,
+        0,
+      ],
+      account: walletClient.account!,
+      chain: walletClient.chain,
+    });
+    await waitForTransactionReceipt(walletClient, { hash: txn });
+
+    if (enableMetrics) {
+      await logMetric(
+        correlationId,
+        Date.now(),
+        walletClient.chain?.id!,
+        contractAddress,
+        walletClient.account?.address!,
+        normalizedName,
+        "subname::setSubnodeRecord",
+        txn,
+        contractType,
+        opType,
+      );
+    }
+  } else {
+    txn = await writeContract(walletClient, {
+      address: contracts.ENS_REGISTRY as `0x${string}`,
+      abi: ensRegistryABI,
+      functionName: "setSubnodeRecord",
+      args: [
+        parentNode,
+        labelHash,
+        walletClient.account?.address,
+        contracts.PUBLIC_RESOLVER,
+        0,
+      ],
+      account: walletClient.account!,
+      chain: walletClient.chain,
+    });
+
+    await waitForTransactionReceipt(walletClient, { hash: txn });
+
+    if (enableMetrics) {
+      await logMetric(
+        correlationId,
+        Date.now(),
+        walletClient.chain?.id!,
+        contractAddress,
+        walletClient.account?.address!,
+        normalizedName,
+        "subname::setSubnodeRecord",
+        txn,
+        contractType,
+        opType,
+      );
+    }
+  }
+
+  return {
+    created: true,
+    transactionHash: txn,
+  };
+}
+
+/**
+ * Set forward resolution for a name to resolve to a contract address
+ */
+export async function setForwardResolution(
+  options: SetForwardResolutionOptions,
+): Promise<SetForwardResolutionResult> {
+  const {
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    contracts,
+    contractType,
+    correlationId = randomUUID(),
+    opType = "enscribe-nameexisting",
+    coinType,
+    enableMetrics = false,
+  } = options;
+
+  const fullNameNode = namehash(normalizedName);
+
+  // Check current address
+  const currentAddr = coinType
+    ? ((await readContract(walletClient, {
+        address: contracts.PUBLIC_RESOLVER as `0x${string}`,
+        abi: publicResolverABI,
+        functionName: "addr",
+        args: [fullNameNode, coinType],
+      })) as `0x${string}`)
+    : ((await readContract(walletClient, {
+        address: contracts.PUBLIC_RESOLVER as `0x${string}`,
+        abi: publicResolverABI,
+        functionName: "addr",
+        args: [fullNameNode],
+      })) as `0x${string}`);
+
+  if (currentAddr.toLowerCase() === contractAddress.toLowerCase()) {
+    return {
+      set: false,
+    };
+  }
+
+  // Set forward resolution
+  const txn = coinType
+    ? await writeContract(walletClient, {
+        address: contracts.PUBLIC_RESOLVER as `0x${string}`,
+        abi: publicResolverABI,
+        functionName: "setAddr",
+        args: [fullNameNode, coinType, contractAddress],
+        account: walletClient.account!,
+        chain: walletClient.chain,
+      })
+    : await writeContract(walletClient, {
+        address: contracts.PUBLIC_RESOLVER as `0x${string}`,
+        abi: publicResolverABI,
+        functionName: "setAddr",
+        args: [fullNameNode, contractAddress],
+        account: walletClient.account!,
+        chain: walletClient.chain,
+      });
+
+  await waitForTransactionReceipt(walletClient, { hash: txn });
+
+  if (enableMetrics) {
+    await logMetric(
+      correlationId,
+      Date.now(),
+      walletClient.chain?.id!,
+      contractAddress,
+      walletClient.account?.address!,
+      normalizedName,
+      "fwdres::setAddr",
+      txn,
+      contractType,
+      opType,
+    );
+  }
+
+  return {
+    set: true,
+    transactionHash: txn,
+  };
+}
+
+/**
+ * Set reverse resolution for a contract to resolve back to an ENS name
+ */
+export async function setReverseResolution(
+  options: SetReverseResolutionOptions,
+): Promise<SetReverseResolutionResult> {
+  const {
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    contracts,
+    contractType,
+    correlationId = randomUUID(),
+    opType = "enscribe-nameexisting",
+    enableMetrics = false,
+  } = options;
+
+  // Check if user is the contract owner
+  const isOwner = await isContractOwner(
+    contractAddress,
+    walletClient,
+    contracts.ENS_REGISTRY,
+  );
+
+  if (!isOwner) {
+    return {
+      set: false,
+      reason: "not_owner",
+    };
+  }
+
+  // Set reverse resolution based on contract type
+  let txn;
+  if (contractType === "ReverseClaimer") {
+    const addrLabel = contractAddress.slice(2).toLowerCase();
+    const reversedNode = namehash(addrLabel + "." + "addr.reverse");
+
+    txn = await writeContract(walletClient, {
+      address: contracts.PUBLIC_RESOLVER as `0x${string}`,
+      abi: publicResolverABI,
+      functionName: "setName",
+      args: [reversedNode, normalizedName],
+      account: walletClient.account!,
+      chain: walletClient.chain,
+    });
+
+    await waitForTransactionReceipt(walletClient, { hash: txn });
+
+    if (enableMetrics) {
+      await logMetric(
+        correlationId,
+        Date.now(),
+        walletClient.chain?.id!,
+        contractAddress,
+        walletClient.account?.address!,
+        normalizedName,
+        "revres::setName",
+        txn,
+        "ReverseClaimer",
+        opType,
+      );
+    }
+  } else if (contractType === "Ownable") {
+    txn = await writeContract(walletClient, {
+      address: contracts.REVERSE_REGISTRAR as `0x${string}`,
+      abi: reverseRegistrarABI,
+      functionName: "setNameForAddr",
+      args: [
+        contractAddress,
+        walletClient.account?.address,
+        contracts.PUBLIC_RESOLVER,
+        normalizedName,
+      ],
+      account: walletClient.account!,
+      chain: walletClient.chain,
+    });
+
+    await waitForTransactionReceipt(walletClient, { hash: txn });
+
+    if (enableMetrics) {
+      await logMetric(
+        correlationId,
+        Date.now(),
+        walletClient.chain?.id!,
+        contractAddress,
+        walletClient.account?.address!,
+        normalizedName,
+        "revres::setNameForAddr",
+        txn,
+        "Ownable",
+        opType,
+      );
+    }
+  } else {
+    throw new Error("Only Ownable, ERC173 and ReverseClaimer contracts can be named.");
+  }
+
+  return {
+    set: true,
+    transactionHash: txn,
+  };
+}
+
+/**
  * Name a contract with ENS
  * This is the main entry point for the library
  */
@@ -156,22 +461,10 @@ export async function nameContract(
     l2Contracts,
     correlationId = randomUUID(),
     opType = "enscribe-nameexisting",
+    enableMetrics = false,
   } = options;
 
-  const { label, parent } = parseNormalizedName(normalizedName);
-  const parentNode = namehash(parent);
-  const labelHash = keccak256(toBytes(label));
-  const fullNameNode = namehash(normalizedName);
-
   const transactions: NameContractResult["transactions"] = {};
-
-  // Check if name exists
-  const nameExists = (await readContract(l1WalletClient, {
-    address: l1Contracts.ENS_REGISTRY as `0x${string}`,
-    abi: ensRegistryABI,
-    functionName: "recordExists",
-    args: [fullNameNode],
-  })) as boolean;
 
   // Detect contract type
   const contractType = await detectContractType(
@@ -181,229 +474,66 @@ export async function nameContract(
   );
 
   // Create subname if it doesn't exist
-  if (!nameExists) {
-    process.stdout.write(`creating subname ... `);
-    let txn;
-    const isWrapped = await readContract(l1WalletClient, {
-      address: l1Contracts.NAME_WRAPPER as `0x${string}`,
-      abi: nameWrapperABI,
-      functionName: "isWrapped",
-      args: [parentNode],
-    });
-
-    if (isWrapped) {
-      txn = await writeContract(l1WalletClient, {
-        address: l1Contracts.NAME_WRAPPER as `0x${string}`,
-        abi: nameWrapperABI,
-        functionName: "setSubnodeRecord",
-        args: [
-          parentNode,
-          label,
-          l1WalletClient.account?.address,
-          l1Contracts.PUBLIC_RESOLVER,
-          0,
-          0,
-          0,
-        ],
-        account: l1WalletClient.account!,
-        chain: l1WalletClient.chain,
-      });
-      await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l1WalletClient.chain?.id!,
-        contractAddress,
-        l1WalletClient.account?.address!,
-        normalizedName,
-        "subname::setSubnodeRecord",
-        txn,
-        contractType,
-        opType,
-      );
-    } else {
-      txn = await writeContract(l1WalletClient, {
-        address: l1Contracts.ENS_REGISTRY as `0x${string}`,
-        abi: ensRegistryABI,
-        functionName: "setSubnodeRecord",
-        args: [
-          parentNode,
-          labelHash,
-          l1WalletClient.account?.address,
-          l1Contracts.PUBLIC_RESOLVER,
-          0,
-        ],
-        account: l1WalletClient.account!,
-        chain: l1WalletClient.chain,
-      });
-
-      await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l1WalletClient.chain?.id!,
-        contractAddress,
-        l1WalletClient.account?.address!,
-        normalizedName,
-        "subname::setSubnodeRecord",
-        txn,
-        contractType,
-        opType,
-      );
-    }
-    transactions.subname = txn;
-  } else {
-    process.stdout.write(`${normalizedName} already exists. skipping subname creation.\n`);
+  const subnameResult = await createSubname({
+    name: normalizedName,
+    walletClient: l1WalletClient,
+    contracts: l1Contracts,
+    contractAddress,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
+  if (subnameResult.created && subnameResult.transactionHash) {
+    transactions.subname = subnameResult.transactionHash;
   }
 
   // Set forward resolution
-  process.stdout.write(`setting forward resolution ... `);
-  const currentAddr = (await readContract(l1WalletClient, {
-    address: l1Contracts.PUBLIC_RESOLVER as `0x${string}`,
-    abi: publicResolverABI,
-    functionName: "addr",
-    args: [fullNameNode],
-  })) as `0x${string}`;
-
-  if (currentAddr.toLowerCase() !== contractAddress.toLowerCase()) {
-    let txn = await writeContract(l1WalletClient, {
-      address: l1Contracts.PUBLIC_RESOLVER as `0x${string}`,
-      abi: publicResolverABI,
-      functionName: "setAddr",
-      args: [fullNameNode, contractAddress],
-      account: l1WalletClient.account!,
-      chain: l1WalletClient.chain,
-    });
-
-    await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-    process.stdout.write(`done with txn: ${txn}\n`);
-    await logMetric(
-      correlationId,
-      Date.now(),
-      l1WalletClient.chain?.id!,
-      contractAddress,
-      l1WalletClient.account?.address!,
-      normalizedName,
-      "fwdres::setAddr",
-      txn,
-      contractType,
-      opType,
-    );
-    transactions.forwardResolution = txn;
-  } else {
-    process.stdout.write("forward resolution already set.\n");
+  const forwardResResult = await setForwardResolution({
+    name: normalizedName,
+    contractAddress,
+    walletClient: l1WalletClient,
+    contracts: l1Contracts,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
+  if (forwardResResult.set && forwardResResult.transactionHash) {
+    transactions.forwardResolution = forwardResResult.transactionHash;
   }
 
   // Set reverse resolution
-  process.stdout.write(`setting reverse resolution ... `);
-  if (await isContractOwner(contractAddress, l1WalletClient, l1Contracts.ENS_REGISTRY)) {
-    let txn;
-    if (contractType === "ReverseClaimer") {
-      const addrLabel = contractAddress.slice(2).toLowerCase();
-      const reversedNode = namehash(addrLabel + "." + "addr.reverse");
-
-      txn = await writeContract(l1WalletClient, {
-        address: l1Contracts.PUBLIC_RESOLVER as `0x${string}`,
-        abi: publicResolverABI,
-        functionName: "setName",
-        args: [reversedNode, normalizedName],
-        account: l1WalletClient.account!,
-        chain: l1WalletClient.chain,
-      });
-
-      await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l1WalletClient.chain?.id!,
-        contractAddress,
-        l1WalletClient.account?.address!,
-        normalizedName,
-        "revres::setName",
-        txn,
-        "ReverseClaimer",
-        opType,
-      );
-    } else if (contractType === "Ownable") {
-      txn = await writeContract(l1WalletClient, {
-        address: l1Contracts.REVERSE_REGISTRAR as `0x${string}`,
-        abi: reverseRegistrarABI,
-        functionName: "setNameForAddr",
-        args: [
-          contractAddress,
-          l1WalletClient.account?.address,
-          l1Contracts.PUBLIC_RESOLVER,
-          normalizedName,
-        ],
-        account: l1WalletClient.account!,
-        chain: l1WalletClient.chain,
-      });
-
-      await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l1WalletClient.chain?.id!,
-        contractAddress,
-        l1WalletClient.account?.address!,
-        normalizedName,
-        "revres::setNameForAddr",
-        txn,
-        "Ownable",
-        opType,
-      );
-    } else {
-      throw new Error("Only Ownable, ERC173 and ReverseClaimer contracts can be named.");
-    }
-    transactions.reverseResolution = txn;
-  } else {
-    console.log("You are not the owner of this contract. Skipping reverse resolution.");
+  const reverseResResult = await setReverseResolution({
+    name: normalizedName,
+    contractAddress,
+    walletClient: l1WalletClient,
+    contracts: l1Contracts,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
+  if (reverseResResult.set && reverseResResult.transactionHash) {
+    transactions.reverseResolution = reverseResResult.transactionHash;
   }
 
   // Handle L2 if provided
   if (l2WalletClient && l2Contracts) {
-    const l2CurrentAddr = (await readContract(l1WalletClient, {
-      address: l1Contracts.PUBLIC_RESOLVER as `0x${string}`,
-      abi: publicResolverABI,
-      functionName: "addr",
-      args: [fullNameNode, Number(l2Contracts.COIN_TYPE)],
-    })) as `0x${string}`;
-
     // Set forward resolution on L2
-    if (l2CurrentAddr.toLowerCase() !== contractAddress.toLowerCase()) {
-      process.stdout.write(`setting forward resolution on L2 ... `);
-      let txn = await writeContract(l1WalletClient, {
-        address: l1Contracts.PUBLIC_RESOLVER as `0x${string}`,
-        abi: publicResolverABI,
-        functionName: "setAddr",
-        args: [fullNameNode, Number(l2Contracts.COIN_TYPE), contractAddress],
-        account: l1WalletClient.account!,
-        chain: l1WalletClient.chain,
-      });
-
-      await waitForTransactionReceipt(l1WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l1WalletClient.chain?.id!,
-        contractAddress,
-        l1WalletClient.account?.address!,
-        normalizedName,
-        "fwdres::setAddr",
-        txn,
-        contractType,
-        opType,
-      );
-      transactions.l2ForwardResolution = txn;
-    } else {
-      console.log("forward resolution already set on L2.");
+    const l2ForwardResResult = await setForwardResolution({
+      name: normalizedName,
+      contractAddress,
+      walletClient: l1WalletClient,
+      contracts: l1Contracts,
+      contractType,
+      correlationId,
+      opType,
+      coinType: Number(l2Contracts.COIN_TYPE),
+      enableMetrics,
+    });
+    if (l2ForwardResResult.set && l2ForwardResResult.transactionHash) {
+      transactions.l2ForwardResolution = l2ForwardResResult.transactionHash;
     }
 
     // Set reverse resolution on L2
@@ -415,7 +545,6 @@ export async function nameContract(
         args: [],
       });
 
-      process.stdout.write(`setting reverse resolution on L2 ... `);
       let txn = await writeContract(l2WalletClient, {
         address: l2Contracts.L2_REVERSE_REGISTRAR as `0x${string}`,
         abi: [
@@ -445,27 +574,27 @@ export async function nameContract(
       });
 
       await waitForTransactionReceipt(l2WalletClient, { hash: txn });
-      process.stdout.write(`done with txn: ${txn}\n`);
-      await logMetric(
-        correlationId,
-        Date.now(),
-        l2WalletClient.chain?.id!,
-        contractAddress,
-        l2WalletClient.account?.address!,
-        normalizedName,
-        "revres::setNameForAddr",
-        txn,
-        contractType,
-        opType,
-      );
+      if (enableMetrics) {
+        await logMetric(
+          correlationId,
+          Date.now(),
+          l2WalletClient.chain?.id!,
+          contractAddress,
+          l2WalletClient.account?.address!,
+          normalizedName,
+          "revres::setNameForAddr",
+          txn,
+          contractType,
+          opType,
+        );
+      }
       transactions.l2ReverseResolution = txn;
     } catch (err) {
-      console.log("contract is not ownable on L2. skipping reverse resolution.");
+      // Contract is not ownable on L2, skip reverse resolution
     }
   }
 
   const explorerUrl = `https://app.enscribe.xyz/explore/${l1WalletClient.chain?.id}/${normalizedName}`;
-  console.log(`✨ Contract named: ${explorerUrl}`);
 
   return {
     success: true,
