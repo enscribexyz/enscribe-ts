@@ -1,0 +1,52 @@
+{
+  "name": "@enscribe/core",
+  "version": "0.1.0",
+  "description": "Core library for ENS contract naming",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enscribexyz/enscribe-core.git"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ens",
+    "ethereum",
+    "naming",
+    "enscribe",
+    "smart-contracts",
+    "web3",
+    "viem"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "viem": "^2.38.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "5.9.2"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
+
