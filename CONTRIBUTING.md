@@ -1,13 +1,13 @@
-# Contributing to @enscribe/core
+# Contributing to @enscribe/enscribe
 
-Thank you for your interest in contributing to @enscribe/core! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to @enscribe/enscribe! This document provides guidelines and instructions for contributing.
 
 ## Development Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/enscribexyz/enscribe-core.git
-cd enscribe-core
+git clone https://github.com/enscribexyz/enscribe-enscribe.git
+cd enscribe-enscribe
 ```
 
 2. Install dependencies:
@@ -58,7 +58,7 @@ To test the library locally with another project:
 pnpm link --global
 
 # In your test project
-pnpm link --global @enscribe/core
+pnpm link --global @enscribe/enscribe
 ```
 
 ## Adding New Networks
@@ -122,5 +122,5 @@ If you have questions about contributing, feel free to:
 - Reach out to the maintainers
 - Check existing issues and discussions
 
-Thank you for contributing to @enscribe/core! 🎉
+Thank you for contributing to @enscribe/enscribe! 🎉
 

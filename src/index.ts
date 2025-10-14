@@ -1,5 +1,5 @@
 /**
- * @enscribe/core - Core library for ENS contract naming
+ * @enscribe/enscribe - Core library for ENS contract naming
  *
  * This library provides the core functionality for naming smart contracts
  * with ENS (Ethereum Name Service). It handles subname creation, forward
@@ -8,6 +8,9 @@
 
 // Main API
 export { nameContract } from "./naming.js";
+
+// Network utilities
+export { getNetworkInfo } from "./naming.js";
 
 // Individual naming steps (can be used independently)
 export {

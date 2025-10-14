@@ -1,15 +1,15 @@
-# @enscribe/core
+# @enscribe/enscribe
 
 Core TypeScript library for ENS contract naming. This library provides the fundamental functionality for naming smart contracts with ENS (Ethereum Name Service), handling subname creation, forward and reverse resolution, and supporting both L1 and L2 networks.
 
 ## Installation
 
 ```bash
-npm install @enscribe/core viem
+npm install @enscribe/enscribe
 # or
-pnpm add @enscribe/core viem
+pnpm add @enscribe/enscribe
 # or
-yarn add @enscribe/core viem
+yarn add @enscribe/enscribe
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ yarn add @enscribe/core viem
 ### Basic Example
 
 ```typescript
-import { nameContract, getContractAddresses } from "@enscribe/core";
+import { nameContract } from "@enscribe/enscribe";
 import { createWalletClient, http } from "viem";
 import { sepolia } from "viem/chains";
 
@@ -28,20 +28,13 @@ const walletClient = createWalletClient({
   account: "0x...", // your account address
 });
 
-// Get contract addresses for Sepolia
-const l1Contracts = getContractAddresses("sepolia");
-
-// Name a contract
+// Name a contract - the library handles all network configuration internally
 const result = await nameContract({
   name: "mycontract.myname.eth",
   contractAddress: "0x1234567890123456789012345678901234567890",
-  l1WalletClient: walletClient,
-  l1Contracts: {
-    ENS_REGISTRY: l1Contracts.ENS_REGISTRY,
-    PUBLIC_RESOLVER: l1Contracts.PUBLIC_RESOLVER,
-    NAME_WRAPPER: l1Contracts.NAME_WRAPPER,
-    REVERSE_REGISTRAR: l1Contracts.REVERSE_REGISTRAR,
-  },
+  walletClient,
+  chainName: "sepolia", // Library determines contracts and network logic
+  enableMetrics: true, // Optional: enable metrics logging
 });
 
 console.log(`Contract named successfully!`);
@@ -53,31 +46,24 @@ console.log(`Transactions:`, result.transactions);
 ### With L2 Support
 
 ```typescript
-import { nameContract, getContractAddresses } from "@enscribe/core";
+import { nameContract } from "@enscribe/enscribe";
+import { createWalletClient, http } from "viem";
+import { optimismSepolia } from "viem/chains";
 
-// Get contract addresses for both networks
-const l1Contracts = getContractAddresses("sepolia");
-const l2Contracts = getContractAddresses("optimism-sepolia");
+// Create L2 wallet client
+const l2WalletClient = createWalletClient({
+  chain: optimismSepolia,
+  transport: http(),
+  account: "0x...",
+});
 
+// Name a contract on L2 - library handles all network logic
 const result = await nameContract({
   name: "mycontract.myname.eth",
   contractAddress: "0x1234567890123456789012345678901234567890",
-  l1WalletClient: l1Client,
-  l1Contracts: {
-    ENS_REGISTRY: l1Contracts.ENS_REGISTRY,
-    PUBLIC_RESOLVER: l1Contracts.PUBLIC_RESOLVER,
-    NAME_WRAPPER: l1Contracts.NAME_WRAPPER,
-    REVERSE_REGISTRAR: l1Contracts.REVERSE_REGISTRAR,
-  },
-  l2WalletClient: l2Client,
-  l2Contracts: {
-    ENS_REGISTRY: l2Contracts.ENS_REGISTRY,
-    PUBLIC_RESOLVER: l2Contracts.PUBLIC_RESOLVER,
-    NAME_WRAPPER: l2Contracts.NAME_WRAPPER,
-    REVERSE_REGISTRAR: l2Contracts.REVERSE_REGISTRAR,
-    L2_REVERSE_REGISTRAR: l2Contracts.L2_REVERSE_REGISTRAR,
-    COIN_TYPE: l2Contracts.COIN_TYPE,
-  },
+  walletClient: l2WalletClient, // L2 wallet client
+  chainName: "optimism-sepolia", // Library determines L1/L2 setup
+  enableMetrics: true,
 });
 ```
 
@@ -90,13 +76,13 @@ The main function to name a contract with ENS.
 #### Options
 
 - **name** (`string`): The normalized ENS name to assign to the contract
-- **contractAddress** (`string`): The address of the contract to name
-- **l1WalletClient** (`WalletClient`): Viem wallet client for L1 transactions
-- **l1Contracts** (`ENSContracts`): L1 ENS contract addresses
-- **l2WalletClient** (`WalletClient | null`, optional): Viem wallet client for L2 transactions
-- **l2Contracts** (`ENSContracts | null`, optional): L2 ENS contract addresses
+- **contractAddress** (`string`): The address of the contract to name  
+- **walletClient** (`WalletClient`): Viem wallet client for transactions
+- **chainName** (`string`): Network name (e.g., "sepolia", "optimism-sepolia", "base", etc.)
+- **l2WalletClient** (`WalletClient | null`, optional): Additional L2 wallet client if needed
 - **correlationId** (`string`, optional): Correlation ID for metrics tracking
 - **opType** (`string`, optional): Operation type for metrics
+- **enableMetrics** (`boolean`, optional): Enable metrics logging (default: false)
 
 #### Returns
 
@@ -151,7 +137,7 @@ Get ENS contract addresses for a specific network.
 
 **Example:**
 ```typescript
-import { getContractAddresses } from "@enscribe/core";
+import { getContractAddresses } from "@enscribe/enscribe";
 
 const contracts = getContractAddresses("sepolia");
 console.log(contracts.ENS_REGISTRY); // "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
@@ -163,7 +149,7 @@ Get the network name from a chain ID.
 
 **Example:**
 ```typescript
-import { getNetworkNameFromChainId } from "@enscribe/core";
+import { getNetworkNameFromChainId } from "@enscribe/enscribe";
 
 const networkName = getNetworkNameFromChainId(11155111); // "sepolia"
 ```

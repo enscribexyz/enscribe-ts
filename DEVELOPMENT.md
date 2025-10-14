@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@enscribe/core` is a standalone TypeScript library for ENS contract naming. It can be used by any JavaScript/TypeScript application, including the `@enscribe/hardhat-enscribe` plugin.
+`@enscribe/enscribe` is a standalone TypeScript library for ENS contract naming. It can be used by any JavaScript/TypeScript application, including the `@enscribe/hardhat-enscribe` plugin.
 
 ## Repository Structure
 
@@ -87,7 +87,7 @@ pnpm publish --tag beta
 ```json
 {
   "dependencies": {
-    "@enscribe/core": "^0.1.0"
+    "@enscribe/enscribe": "^0.1.0"
   }
 }
 ```
@@ -113,7 +113,7 @@ Test the library with:
 
 Example standalone test script:
 ```typescript
-import { nameContract, getContractAddresses } from "@enscribe/core";
+import { nameContract, getContractAddresses } from "@enscribe/enscribe";
 // ... test code
 ```
 
@@ -155,7 +155,7 @@ Follow semantic versioning:
 
 ## Troubleshooting
 
-### "Cannot find module '@enscribe/core'"
+### "Cannot find module '@enscribe/enscribe'"
 
 If the plugin can't find the library:
 1. Ensure the library is built: `cd /Users/abhi/code/enscribe && pnpm run build`

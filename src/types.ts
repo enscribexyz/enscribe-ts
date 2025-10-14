@@ -20,16 +20,12 @@ export interface NameContractOptions {
   name: string;
   /** The contract address to name */
   contractAddress: string;
-  /** L1 wallet client */
-  l1WalletClient: WalletClient;
-  /** L1 ENS contract addresses */
-  l1Contracts: ENSContracts;
-  /** Optional L2 wallet client */
+  /** Primary wallet client (L1 or the main network) */
+  walletClient: WalletClient;
+  /** Optional secondary wallet client (for L2 if applicable) */
   l2WalletClient?: WalletClient | null;
-  /** Optional L2 ENS contract addresses */
-  l2Contracts?: ENSContracts | null;
-  /** Optional correlation ID for metrics */
-  correlationId?: string;
+  /** Chain name (e.g., "sepolia", "linea-sepolia", "optimism", etc.) */
+  chainName: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Enable metrics logging (default: false) */
@@ -79,8 +75,6 @@ export interface CreateSubnameOptions {
   contractAddress: string;
   /** Contract type (for metrics) */
   contractType: ContractType;
-  /** Optional correlation ID for metrics */
-  correlationId?: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Enable metrics logging (default: false) */
@@ -111,8 +105,6 @@ export interface SetForwardResolutionOptions {
   contracts: ENSContracts;
   /** Contract type (for metrics) */
   contractType: ContractType;
-  /** Optional correlation ID for metrics */
-  correlationId?: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Optional coin type for L2 resolution */
@@ -145,8 +137,6 @@ export interface SetReverseResolutionOptions {
   contracts: ENSContracts;
   /** Contract type */
   contractType: ContractType;
-  /** Optional correlation ID for metrics */
-  correlationId?: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Enable metrics logging (default: false) */

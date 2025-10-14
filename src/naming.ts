@@ -30,6 +30,8 @@ import type {
   SetReverseResolutionResult,
 } from "./types.js";
 
+import { getContractAddresses } from "./contracts.js";
+
 /**
  * Check if a contract implements the Ownable interface
  */
@@ -153,10 +155,11 @@ export async function createSubname(
     contracts,
     contractAddress,
     contractType,
-    correlationId = randomUUID(),
     opType = "enscribe-nameexisting",
     enableMetrics = false,
   } = options;
+
+  const correlationId = randomUUID();
 
   const { label, parent } = parseNormalizedName(normalizedName);
   const parentNode = namehash(parent);
@@ -271,11 +274,12 @@ export async function setForwardResolution(
     walletClient,
     contracts,
     contractType,
-    correlationId = randomUUID(),
     opType = "enscribe-nameexisting",
     coinType,
     enableMetrics = false,
   } = options;
+
+  const correlationId = randomUUID();
 
   const fullNameNode = namehash(normalizedName);
 
@@ -354,10 +358,11 @@ export async function setReverseResolution(
     walletClient,
     contracts,
     contractType,
-    correlationId = randomUUID(),
     opType = "enscribe-nameexisting",
     enableMetrics = false,
   } = options;
+
+  const correlationId = randomUUID();
 
   // Check if user is the contract owner
   const isOwner = await isContractOwner(
@@ -446,6 +451,33 @@ export async function setReverseResolution(
 }
 
 /**
+ * Determine if a chain is L2 and get L1 network name
+ */
+export function getNetworkInfo(chainName: string): { isL2: boolean; l1NetworkName: string; l2NetworkName?: string } {
+  const chainLower = chainName.toLowerCase();
+  
+  if (
+    chainLower === "linea-sepolia" ||
+    chainLower === "optimism-sepolia" ||
+    chainLower === "arbitrum-sepolia" ||
+    chainLower === "scroll-sepolia" ||
+    chainLower === "base-sepolia"
+  ) {
+    return { isL2: true, l1NetworkName: "sepolia", l2NetworkName: chainLower };
+  } else if (
+    chainLower === "linea" ||
+    chainLower === "optimism" ||
+    chainLower === "arbitrum" ||
+    chainLower === "scroll" ||
+    chainLower === "base"
+  ) {
+    return { isL2: true, l1NetworkName: "mainnet", l2NetworkName: chainLower };
+  } else {
+    return { isL2: false, l1NetworkName: chainLower };
+  }
+}
+
+/**
  * Name a contract with ENS
  * This is the main entry point for the library
  */
@@ -455,16 +487,26 @@ export async function nameContract(
   const {
     name: normalizedName,
     contractAddress,
-    l1WalletClient,
-    l1Contracts,
+    walletClient,
     l2WalletClient,
-    l2Contracts,
-    correlationId = randomUUID(),
+    chainName,
     opType = "enscribe-nameexisting",
     enableMetrics = false,
   } = options;
 
+  const correlationId = randomUUID();
+
   const transactions: NameContractResult["transactions"] = {};
+
+  // Determine network configuration
+  const networkInfo = getNetworkInfo(chainName);
+  const l1Contracts = getContractAddresses(networkInfo.l1NetworkName as any);
+  const l2Contracts = networkInfo.l2NetworkName 
+    ? getContractAddresses(networkInfo.l2NetworkName as any) 
+    : null;
+
+  // Use the primary wallet client as l1WalletClient for API compatibility
+  const l1WalletClient = walletClient;
 
   // Detect contract type
   const contractType = await detectContractType(
@@ -480,7 +522,6 @@ export async function nameContract(
     contracts: l1Contracts,
     contractAddress,
     contractType,
-    correlationId,
     opType,
     enableMetrics,
   });
@@ -495,7 +536,6 @@ export async function nameContract(
     walletClient: l1WalletClient,
     contracts: l1Contracts,
     contractType,
-    correlationId,
     opType,
     enableMetrics,
   });
@@ -510,7 +550,6 @@ export async function nameContract(
     walletClient: l1WalletClient,
     contracts: l1Contracts,
     contractType,
-    correlationId,
     opType,
     enableMetrics,
   });
@@ -527,7 +566,6 @@ export async function nameContract(
       walletClient: l1WalletClient,
       contracts: l1Contracts,
       contractType,
-      correlationId,
       opType,
       coinType: Number(l2Contracts.COIN_TYPE),
       enableMetrics,

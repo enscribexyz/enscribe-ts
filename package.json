@@ -1,5 +1,5 @@
 {
-  "name": "@enscribe/core",
+  "name": "@enscribe/enscribe",
   "version": "0.1.0",
   "description": "Core library for ENS contract naming",
   "license": "MIT",
