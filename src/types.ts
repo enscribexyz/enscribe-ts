@@ -8,7 +8,6 @@ export interface ENSContracts {
   PUBLIC_RESOLVER: string;
   NAME_WRAPPER: string;
   REVERSE_REGISTRAR: string;
-  L2_REVERSE_REGISTRAR?: string;
   COIN_TYPE?: number;
 }
 
@@ -20,10 +19,8 @@ export interface NameContractOptions {
   name: string;
   /** The contract address to name */
   contractAddress: string;
-  /** Primary wallet client (L1 or the main network) */
+  /** Wallet client */
   walletClient: WalletClient;
-  /** Optional secondary wallet client (for L2 if applicable) */
-  l2WalletClient?: WalletClient | null;
   /** Chain name (e.g., "sepolia", "linea-sepolia", "optimism", etc.) */
   chainName: string;
   /** Optional operation type for metrics */
@@ -47,8 +44,6 @@ export interface NameContractResult {
     subname?: string;
     forwardResolution?: string;
     reverseResolution?: string;
-    l2ForwardResolution?: string;
-    l2ReverseResolution?: string;
   };
   /** Type of contract detected */
   contractType: "Ownable" | "ReverseClaimer" | "Unknown";
@@ -67,14 +62,16 @@ export type ContractType = "Ownable" | "ReverseClaimer" | "Unknown";
 export interface CreateSubnameOptions {
   /** The normalized ENS name */
   name: string;
-  /** L1 wallet client */
+  /** Wallet client */
   walletClient: WalletClient;
-  /** L1 ENS contract addresses */
+  /** ENS contract addresses */
   contracts: ENSContracts;
   /** Contract address being named (for metrics) */
   contractAddress: string;
   /** Contract type (for metrics) */
   contractType: ContractType;
+  /** Correlation ID for metrics */
+  correlationId: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Enable metrics logging (default: false) */
@@ -99,12 +96,14 @@ export interface SetForwardResolutionOptions {
   name: string;
   /** The contract address to resolve to */
   contractAddress: string;
-  /** L1 wallet client */
+  /** Wallet client */
   walletClient: WalletClient;
-  /** L1 ENS contract addresses */
+  /** ENS contract addresses */
   contracts: ENSContracts;
   /** Contract type (for metrics) */
   contractType: ContractType;
+  /** Correlation ID for metrics */
+  correlationId: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Optional coin type for L2 resolution */
@@ -137,6 +136,8 @@ export interface SetReverseResolutionOptions {
   contracts: ENSContracts;
   /** Contract type */
   contractType: ContractType;
+  /** Correlation ID for metrics */
+  correlationId: string;
   /** Optional operation type for metrics */
   opType?: string;
   /** Enable metrics logging (default: false) */
