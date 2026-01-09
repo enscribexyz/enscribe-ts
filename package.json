@@ -1,6 +1,6 @@
 {
   "name": "@enscribe/enscribe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Core library for ENS contract naming",
   "license": "MIT",
   "repository": {
@@ -46,7 +46,8 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
-    "example": "tsx examples/register-name.ts"
+    "example": "tsx examples/register-name.ts",
+    "example:ownable": "tsx examples/check-ownable.ts"
   },
   "publishConfig": {
     "access": "public"
