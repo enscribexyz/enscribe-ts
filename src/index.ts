@@ -13,7 +13,12 @@ export {
   isContractOwner,
   isOwnable,
   isReverseClaimable,
+  getNetworkInfo
 } from "./utils.js";
+
+export {
+  getContractAddresses,
+} from "./contracts.js";
 
 // Types
 export type {
