@@ -7,17 +7,19 @@
  */
 
 // Main API
-export { nameContract } from "./naming.js";
+export { nameContract, setForwardName, setReverseName } from "./naming.js";
 
 export {
   isContractOwner,
   isOwnable,
   isReverseClaimable,
+  detectContractType,
   getNetworkInfo
 } from "./utils.js";
 
 export {
   getContractAddresses,
+  getNetworkNameFromChainId,
 } from "./contracts.js";
 
 // Types
@@ -32,4 +34,8 @@ export type {
   SetForwardResolutionResult,
   SetReverseResolutionOptions,
   SetReverseResolutionResult,
+  SetForwardNameOptions,
+  SetReverseNameOptions,
 } from "./types.js";
+
+export type { NetworkName } from "./contracts.js";

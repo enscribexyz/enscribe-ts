@@ -17,6 +17,10 @@ import type {
   NameContractResult,
   ContractType,
   ENSContracts,
+  SetForwardNameOptions,
+  SetForwardResolutionResult,
+  SetReverseNameOptions,
+  SetReverseResolutionResult,
 } from "./types.js";
 
 import { getContractAddresses } from "./contracts.js";
@@ -164,5 +168,129 @@ export async function nameContract(
     contractType,
     explorerUrl,
   };
+}
+
+/**
+ * Set only the forward record (name -> address) for a contract.
+ *
+ * Unlike `nameContract`, this performs the forward-resolution step in isolation —
+ * it does not create a subname or set the reverse record. The single transaction
+ * is signed by the provided wallet, which must already control the ENS name node.
+ *
+ * Handles L1/L2 branching (including the L2 coin type) internally. Returns
+ * `{ set: false }` without a transaction when the name already resolves to the
+ * given address.
+ */
+export async function setForwardName(
+  options: SetForwardNameOptions,
+): Promise<SetForwardResolutionResult> {
+  const {
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    chainName,
+    opType = "enscribe-nameforward",
+    enableMetrics = false,
+    contractType: providedType,
+  } = options;
+
+  const correlationId = randomUUID();
+
+  // Determine network configuration
+  const networkInfo = getNetworkInfo(chainName);
+  const contracts = getContractAddresses(networkInfo.networkName as any);
+
+  // contractType only feeds metrics on the forward path — avoid an RPC round-trip
+  // unless metrics are enabled and the caller hasn't supplied the type.
+  const contractType: ContractType =
+    providedType ??
+    (enableMetrics
+      ? await detectContractType(
+          contractAddress,
+          walletClient,
+          contracts.ENS_REGISTRY,
+        )
+      : "Unknown");
+
+  if (networkInfo.isL2) {
+    return setForwardResolutionL2({
+      name: normalizedName,
+      contractAddress,
+      walletClient,
+      contracts,
+      contractType,
+      correlationId,
+      opType,
+      coinType: Number(contracts.COIN_TYPE),
+      enableMetrics,
+    });
+  }
+
+  return setForwardResolutionL1({
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    contracts,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
+}
+
+/**
+ * Set only the reverse record (primary name) for a contract.
+ *
+ * Unlike `nameContract`, this performs the reverse-resolution step in isolation —
+ * it does not create a subname or set forward resolution. Use it when the forward
+ * path is already complete (e.g. handled server-side) and only the user-signed
+ * reverse step remains. The single transaction is signed by the provided wallet.
+ *
+ * Handles L1/L2 branching and Ownable vs ReverseClaimer contract types internally.
+ * Returns `{ set: false, reason: "not_owner" }` (without throwing) when the wallet
+ * is not the contract owner, so callers can surface their own messaging.
+ */
+export async function setReverseName(
+  options: SetReverseNameOptions,
+): Promise<SetReverseResolutionResult> {
+  const {
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    chainName,
+    opType = "enscribe-namereverse",
+    enableMetrics = false,
+    contractType: providedType,
+  } = options;
+
+  const correlationId = randomUUID();
+
+  // Determine network configuration
+  const networkInfo = getNetworkInfo(chainName);
+  const contracts = getContractAddresses(networkInfo.networkName as any);
+
+  // Skip detection if the caller already knows the type (one fewer RPC round-trip)
+  const contractType: ContractType =
+    providedType ??
+    (await detectContractType(
+      contractAddress,
+      walletClient,
+      contracts.ENS_REGISTRY,
+    ));
+
+  const setReverseResolution = networkInfo.isL2
+    ? setReverseResolutionL2
+    : setReverseResolutionL1;
+
+  return setReverseResolution({
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    contracts,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
 }
 

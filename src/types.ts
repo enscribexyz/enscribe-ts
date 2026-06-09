@@ -57,6 +57,35 @@ export interface NameContractResult {
 export type ContractType = "Ownable" | "ReverseClaimer" | "Unknown";
 
 /**
+ * Options for setting only the forward record (name -> address) of a contract.
+ *
+ * Use this to run the forward-resolution step in isolation, without creating a
+ * subname or setting the reverse record. The caller must already control the
+ * ENS name node.
+ */
+export interface SetForwardNameOptions extends NameContractOptions {
+  /**
+   * Pre-known contract type. On the forward path this only affects metrics
+   * labelling. If omitted, it is auto-detected only when `enableMetrics` is true.
+   */
+  contractType?: ContractType;
+}
+
+/**
+ * Options for setting only the reverse record (primary name) of a contract.
+ *
+ * Use this when forward resolution (and the subname) is already in place —
+ * e.g. handled server-side — and only the user-signed reverse step remains.
+ */
+export interface SetReverseNameOptions extends NameContractOptions {
+  /**
+   * Pre-known contract type. If omitted, it is auto-detected, which costs an
+   * extra RPC round-trip. Pass "Ownable" or "ReverseClaimer" to skip detection.
+   */
+  contractType?: ContractType;
+}
+
+/**
  * Options for creating a subname
  */
 export interface CreateSubnameOptions {
