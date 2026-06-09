@@ -57,6 +57,20 @@ export interface NameContractResult {
 export type ContractType = "Ownable" | "ReverseClaimer" | "Unknown";
 
 /**
+ * Options for setting only the reverse record (primary name) of a contract.
+ *
+ * Use this when forward resolution (and the subname) is already in place —
+ * e.g. handled server-side — and only the user-signed reverse step remains.
+ */
+export interface SetReverseNameOptions extends NameContractOptions {
+  /**
+   * Pre-known contract type. If omitted, it is auto-detected, which costs an
+   * extra RPC round-trip. Pass "Ownable" or "ReverseClaimer" to skip detection.
+   */
+  contractType?: ContractType;
+}
+
+/**
  * Options for creating a subname
  */
 export interface CreateSubnameOptions {

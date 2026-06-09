@@ -17,6 +17,8 @@ import type {
   NameContractResult,
   ContractType,
   ENSContracts,
+  SetReverseNameOptions,
+  SetReverseResolutionResult,
 } from "./types.js";
 
 import { getContractAddresses } from "./contracts.js";
@@ -164,5 +166,61 @@ export async function nameContract(
     contractType,
     explorerUrl,
   };
+}
+
+/**
+ * Set only the reverse record (primary name) for a contract.
+ *
+ * Unlike `nameContract`, this performs the reverse-resolution step in isolation —
+ * it does not create a subname or set forward resolution. Use it when the forward
+ * path is already complete (e.g. handled server-side) and only the user-signed
+ * reverse step remains. The single transaction is signed by the provided wallet.
+ *
+ * Handles L1/L2 branching and Ownable vs ReverseClaimer contract types internally.
+ * Returns `{ set: false, reason: "not_owner" }` (without throwing) when the wallet
+ * is not the contract owner, so callers can surface their own messaging.
+ */
+export async function setReverseName(
+  options: SetReverseNameOptions,
+): Promise<SetReverseResolutionResult> {
+  const {
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    chainName,
+    opType = "enscribe-namereverse",
+    enableMetrics = false,
+    contractType: providedType,
+  } = options;
+
+  const correlationId = randomUUID();
+
+  // Determine network configuration
+  const networkInfo = getNetworkInfo(chainName);
+  const contracts = getContractAddresses(networkInfo.networkName as any);
+
+  // Skip detection if the caller already knows the type (one fewer RPC round-trip)
+  const contractType: ContractType =
+    providedType ??
+    (await detectContractType(
+      contractAddress,
+      walletClient,
+      contracts.ENS_REGISTRY,
+    ));
+
+  const setReverseResolution = networkInfo.isL2
+    ? setReverseResolutionL2
+    : setReverseResolutionL1;
+
+  return setReverseResolution({
+    name: normalizedName,
+    contractAddress,
+    walletClient,
+    contracts,
+    contractType,
+    correlationId,
+    opType,
+    enableMetrics,
+  });
 }
 
