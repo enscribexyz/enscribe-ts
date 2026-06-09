@@ -7,7 +7,7 @@
  */
 
 // Main API
-export { nameContract, setReverseName } from "./naming.js";
+export { nameContract, setForwardName, setReverseName } from "./naming.js";
 
 export {
   isContractOwner,
@@ -34,6 +34,7 @@ export type {
   SetForwardResolutionResult,
   SetReverseResolutionOptions,
   SetReverseResolutionResult,
+  SetForwardNameOptions,
   SetReverseNameOptions,
 } from "./types.js";
 
