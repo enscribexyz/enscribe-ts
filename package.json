@@ -33,14 +33,15 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "viem": "^2.38.1"
+  "peerDependencies": {
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "viem": "^2.38.1"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
