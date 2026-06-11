@@ -252,25 +252,31 @@ export async function logMetric(
   contractType: string,
   opType: string,
 ): Promise<void> {
-  await fetch(METRICS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify({
-      co_id: correlationId,
-      contract_address: contractAddress,
-      ens_name: name,
-      deployer_address: senderAddress,
-      network: chainId,
-      timestamp: Math.floor(timestamp / 1000),
-      step: step,
-      txn_hash: txnHash,
-      contract_type: contractType,
-      op_type: opType,
-      source: "enscribe",
-    }),
-  });
+  // Metrics are best-effort. A blocked or failed request (ad-blockers, CORS,
+  // offline, etc. — common in browsers) must never break the naming flow,
+  // especially since this runs after the on-chain transaction has succeeded.
+  try {
+    await fetch(METRICS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        co_id: correlationId,
+        contract_address: contractAddress,
+        ens_name: name,
+        deployer_address: senderAddress,
+        network: chainId,
+        timestamp: Math.floor(timestamp / 1000),
+        step: step,
+        txn_hash: txnHash,
+        contract_type: contractType,
+        op_type: opType,
+        source: "enscribe",
+      }),
+    });
+  } catch {
+    // swallow — analytics failures are non-fatal
+  }
 }
 
