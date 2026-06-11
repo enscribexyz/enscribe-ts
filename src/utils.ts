@@ -187,6 +187,57 @@ export async function isContractOwner(
 }
 
 /**
+ * Generate a correlation ID for metrics.
+ *
+ * Uses the Web Crypto API (`globalThis.crypto`), which is available in browsers
+ * and Node 19+. This deliberately avoids importing the Node `crypto` module so
+ * the package stays browser-bundler friendly — bundlers such as webpack shim
+ * `crypto` with `crypto-browserify`, which does not export `randomUUID`.
+ *
+ * Falls back to `getRandomValues` (RFC4122 v4) and finally to `Math.random`,
+ * since the ID is only used for metrics correlation, not security.
+ */
+export function generateCorrelationId(): string {
+  const webCrypto = (
+    globalThis as unknown as {
+      crypto?: {
+        randomUUID?: () => string;
+        getRandomValues?: <T extends ArrayBufferView>(array: T) => T;
+      };
+    }
+  ).crypto;
+
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
+  }
+
+  if (webCrypto?.getRandomValues) {
+    const bytes = webCrypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+    return (
+      hex.slice(0, 4).join("") +
+      "-" +
+      hex.slice(4, 6).join("") +
+      "-" +
+      hex.slice(6, 8).join("") +
+      "-" +
+      hex.slice(8, 10).join("") +
+      "-" +
+      hex.slice(10, 16).join("")
+    );
+  }
+
+  // Last resort (non-cryptographic) — correlation ID only, never used for security
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Log a metric to the ENScribe API
  */
 export async function logMetric(
