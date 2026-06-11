@@ -1,6 +1,5 @@
 import { writeContract, waitForTransactionReceipt, readContract } from "viem/actions";
 import type { WalletClient } from "viem";
-import { randomUUID } from "crypto";
 
 import ownableContractABI from "./abi/Ownable.js";
 
@@ -10,6 +9,7 @@ import {
   isReverseClaimable,
   detectContractType,
   getNetworkInfo,
+  generateCorrelationId,
 } from "./utils.js";
 
 import type {
@@ -51,7 +51,7 @@ export async function nameContract(
     enableMetrics = false,
   } = options;
 
-  const correlationId = randomUUID();
+  const correlationId = generateCorrelationId();
   const transactions: NameContractResult["transactions"] = {};
 
   // Determine network configuration
@@ -194,7 +194,7 @@ export async function setForwardName(
     contractType: providedType,
   } = options;
 
-  const correlationId = randomUUID();
+  const correlationId = generateCorrelationId();
 
   // Determine network configuration
   const networkInfo = getNetworkInfo(chainName);
@@ -263,7 +263,7 @@ export async function setReverseName(
     contractType: providedType,
   } = options;
 
-  const correlationId = randomUUID();
+  const correlationId = generateCorrelationId();
 
   // Determine network configuration
   const networkInfo = getNetworkInfo(chainName);
